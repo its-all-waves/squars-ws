@@ -5,3 +5,5 @@ server/tmp
 
 .vite
 .air.toml
+
+dist

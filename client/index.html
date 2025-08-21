@@ -1,28 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Web Socket Game</title>
+    </head>
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Web Socket Game</title>
-</head>
+    <script type="module" src="main.ts"></script>
 
-<script type="module" src="main.ts"></script>
-
-<body>
-
-hello world!
-
-</body>
-
+    <body></body>
 </html>
 
 <style>
+    * {
+        padding: 0;
+        margin: 0;
+    }
 
-body {
-  color: white;
-  background-color: #333;
+    :root {
+        background-color: #333;
+        color: white;
+        overflow: hidden;
+    }
 
-}
+    body {
+        position: fixed;
+        inset: 0;
+        border: 2px solid white;
+        overflow-y: auto;
+    }
 
+    .sprite {
+        width: 100px;
+        aspect-ratio: 1/1;
+        background-color: lightseagreen;
+        border: 2px solid lightcoral;
+        box-shadow: 0px 0px 18px rgba(255, 255, 255, 0.8);
+        position: fixed;
+    }
 </style>
