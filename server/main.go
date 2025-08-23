@@ -12,15 +12,15 @@ const CLIENT_DIR = "../client"
 const STATIC_FILES_DIR = CLIENT_DIR + "/dist/"
 
 func main() {
-	eventHub := newHub()
-	go eventHub.run()
+	eventGameHub := newGameHub()
+	go eventGameHub.run()
 
 	// DEBUG - keep sending some shit to the broadcast channel (and thus the client)
 	go func() {
 		for {
-			eventHub.broadcast <- []byte("Some shit right chere")
+			eventGameHub.broadcast <- []byte("Some shit right chere")
 			time.Sleep(3 * time.Second)
-			fmt.Println("broadcast:", eventHub.broadcast)
+			fmt.Println("broadcast:", eventGameHub.broadcast)
 		}
 	}()
 
@@ -29,7 +29,7 @@ func main() {
 	serveMux.Handle("GET /", http.FileServer(http.Dir(STATIC_FILES_DIR)))
 
 	serveMux.HandleFunc("GET /ws", func(w http.ResponseWriter, r *http.Request) {
-		serveWs(eventHub, w, r)
+		serveGame(eventGameHub, w, r)
 	})
 
 	// http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {

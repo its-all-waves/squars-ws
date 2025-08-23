@@ -63,18 +63,38 @@ class Sprite {
 
 let sprite: Sprite;
 
-const pressedKeys = new Set();
+const pressedKeys: Set<string> = new Set();
+
+type PlayerId = string;
+type Timestamp = number;
+type InputState = { up: boolean; down: boolean; left: boolean; right: boolean };
+type GameEventMsg = {
+    timestampMs: Timestamp;
+    playerId: PlayerId;
+    inputState: InputState;
+};
+
+const keyPressMap = {
+    ArrowUp: "up",
+    ArrowDown: "down",
+    ArrowLeft: "left",
+    ArrowRight: "right",
+    w: "up",
+    s: "down",
+    a: "left",
+    d: "right",
+};
 
 function main() {
     sprite = new Sprite();
-    addEventListener("keydown", (e) => pressedKeys.add(e.key));
-    addEventListener("keyup", (e) => pressedKeys.delete(e.key));
+    addEventListener("keydown", (e) => pressedKeys.add(keyPressMap[e.key]));
+    addEventListener("keyup", (e) => pressedKeys.delete(keyPressMap[e.key]));
 
     // set up WS
     console.log("Connecting to websocket...");
     const ws = new WebSocket("ws://" + document.location.host + "/ws");
     ws.onclose = function (e) {
-        alert("Web socket closed!");
+        console.error("Web socket closed!");
     };
     ws.onmessage = function (e: MessageEvent) {
         console.log();
@@ -85,18 +105,32 @@ function main() {
     };
 
     setInterval(() => {
-        update(ws);
-    }, FRAME_INTERVAL);
+        // convert pressed keys to { up, down, left, right: bool }
+        ws.send(
+            JSON.stringify({
+                timestampMs: Date.now(),
+                playerId: "0",
+                inputState: {
+                    up: pressedKeys.has("up"),
+                    down: pressedKeys.has("down"),
+                    left: pressedKeys.has("left"),
+                    right: pressedKeys.has("right"),
+                },
+            }) + "\n",
+        );
+        console.log("sent message");
+    }, 1000);
+    // }, FRAME_INTERVAL);
 }
 
-function update(ws: WebSocket) {
-    spriteHandleKeydown();
-    // TODO: send a message when the user does something
-    // TODO: every 10 seconds, if there's no message to send, ping the server
-    if (ws.readyState === ws.OPEN) {
-        ws.send("ping\n");
-    }
-}
+// function update(ws: WebSocket) {
+//     spriteHandleKeydown();
+//     // TODO: send a message when the user does something
+//     // TODO: every 10 seconds, if there's no message to send, ping the server
+//     if (ws.readyState === ws.OPEN) {
+//         ws.send("ping\n");
+//     }
+// }
 
 type GameEvent = {
     msg: "PLAYER_MOVED" | "TODO";
@@ -112,11 +146,19 @@ function dispatch(e: GameEvent) {
     }
 }
 
-function spriteHandleKeydown() {
-    (pressedKeys.has("ArrowUp") || pressedKeys.has("w")) && sprite.up();
-    (pressedKeys.has("ArrowDown") || pressedKeys.has("s")) && sprite.down();
-    (pressedKeys.has("ArrowLeft") || pressedKeys.has("a")) && sprite.left();
-    (pressedKeys.has("ArrowRight") || pressedKeys.has("d")) && sprite.right();
-}
+// function spriteHandleKeydown(ws: WebSocket) {
+//     if (pressedKeys.has("ArrowUp") || pressedKeys.has("w")) {
+//         sprite.up();
+//     }
+//     if (pressedKeys.has("ArrowDown") || pressedKeys.has("s")) {
+//         sprite.down();
+//     }
+//     if (pressedKeys.has("ArrowLeft") || pressedKeys.has("a")) {
+//         sprite.left();
+//     }
+//     if (pressedKeys.has("ArrowRight") || pressedKeys.has("d")) {
+//         sprite.right();
+//     }
+// }
 
 window.onload = main;
