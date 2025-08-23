@@ -1,5 +1,3 @@
-addEventListener("DOMContentLoaded", main);
-
 const FRAME_RATE = 60; // not true FPS, but num of times we update per second
 const FRAME_INTERVAL = 1 / FRAME_RATE;
 
@@ -71,20 +69,54 @@ function main() {
     sprite = new Sprite();
     addEventListener("keydown", (e) => pressedKeys.add(e.key));
     addEventListener("keyup", (e) => pressedKeys.delete(e.key));
-    setInterval(spriteHandleKeydown, FRAME_INTERVAL);
+
+    // set up WS
+    console.log("Connecting to websocket...");
+    const ws = new WebSocket("ws://" + document.location.host + "/ws");
+    ws.onclose = function (e) {
+        alert("Web socket closed!");
+    };
+    ws.onmessage = function (e: MessageEvent) {
+        console.log();
+        console.log("MSG:", e.data);
+    };
+    ws.onopen = function (e) {
+        console.log("Connected");
+    };
+
+    setInterval(() => {
+        update(ws);
+    }, FRAME_INTERVAL);
 }
 
-function spriteHandleKeydown(e) {
-    if (pressedKeys.has("ArrowUp") || pressedKeys.has("w")) {
-        sprite.up();
-    }
-    if (pressedKeys.has("ArrowDown") || pressedKeys.has("s")) {
-        sprite.down();
-    }
-    if (pressedKeys.has("ArrowLeft") || pressedKeys.has("a")) {
-        sprite.left();
-    }
-    if (pressedKeys.has("ArrowRight") || pressedKeys.has("d")) {
-        sprite.right();
+function update(ws: WebSocket) {
+    spriteHandleKeydown();
+    // TODO: send a message when the user does something
+    // TODO: every 10 seconds, if there's no message to send, ping the server
+    if (ws.readyState === ws.OPEN) {
+        ws.send("ping\n");
     }
 }
+
+type GameEvent = {
+    msg: "PLAYER_MOVED" | "TODO";
+    data: Record<string, string | number>;
+};
+
+function dispatch(e: GameEvent) {
+    switch (e.msg) {
+        case "PLAYER_MOVED":
+            break;
+        case "TODO":
+            break;
+    }
+}
+
+function spriteHandleKeydown() {
+    (pressedKeys.has("ArrowUp") || pressedKeys.has("w")) && sprite.up();
+    (pressedKeys.has("ArrowDown") || pressedKeys.has("s")) && sprite.down();
+    (pressedKeys.has("ArrowLeft") || pressedKeys.has("a")) && sprite.left();
+    (pressedKeys.has("ArrowRight") || pressedKeys.has("d")) && sprite.right();
+}
+
+window.onload = main;
