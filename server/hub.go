@@ -84,7 +84,7 @@ func (c *Client) writeMessagesFromSendChan() {
 		case message, ok := <-c.send:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				// The hub closed the channel.
+				// the hub closed the channel
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
@@ -100,6 +100,8 @@ func (c *Client) writeMessagesFromSendChan() {
 				w.Write(newline)
 				w.Write(<-c.send)
 			}
+
+			// log.Println("WROTE ALL MESSAGES TO:", c.playerId)
 
 			if err := w.Close(); err != nil {
 				return
@@ -146,38 +148,35 @@ func newGameHub() *GameHub {
 	}
 }
 
+/*
+Once per tick, dump the game state into all clients' send channels,
+to be sent by another go routine. Also launch go routines to update
+game state and add/remove players.
+*/
 func (h *GameHub) run() {
 	go h.updateGameState()
+	go h.addRemovePlayers()
+
 	for range h.ticker.C {
-
-		// log.Println("TICK")
-
-		// TODO: load up the broadcast channel
-		gState := h.g
-		gStateMsg, err := json.Marshal(gState)
+		gStateMsg, err := json.Marshal(h.g)
 		if err != nil {
 			log.Println("Couldn't convert game state to json.")
 		}
-		select {
-		case h.broadcast <- gStateMsg:
-		default:
-		}
 
-		select {
-		// if there's something to broadcast, copy it to all clients' send channels
-		case message := <-h.broadcast:
-			log.Println("Pulled msg from broadcast:", string(message))
-			for client := range h.clients {
-				select {
-				case client.send <- message:
-				default:
-					close(client.send)
-					delete(h.clients, client)
-				}
+		for client := range h.clients {
+			select {
+			case client.send <- gStateMsg:
+			default:
+				close(client.send)
+				delete(h.clients, client)
 			}
-		default:
 		}
+	}
+}
 
+/* GO ROUTINE */
+func (h *GameHub) addRemovePlayers() {
+	for {
 		select {
 		case client := <-h.register:
 			h.clients[client] = true
@@ -188,26 +187,20 @@ func (h *GameHub) run() {
 				delete(h.clients, client)
 				close(client.send)
 			}
-		default:
 		}
-
 	}
 }
 
 /*
 GO ROUTINE
-Process all messages for a tick, then load final game state into broadcast channel.
+When there's a message, unmarshal it, and send it to the game to update its state.
 */
 func (h *GameHub) updateGameState() {
-	// TODO: unmarshall messages into game events
-	// TODO: sort messages in queue
-
-	/*
-		THE GOAL: for each queued incoming msg, send it through game for processing. once processed each one, send the final game state for this tick
-	*/
+	// TODO: sort messages in queue ? do we still need to do this?
+	// are we guaranteed to get events in order given all the go
+	// routines and their respective channels?
 
 	for {
-		// when there's a message, unmarshal it, and send it to the game to update its state
 		message, ok := <-h.incoming
 		if !ok {
 			// TODO:
@@ -235,7 +228,6 @@ func (h *GameHub) updateGameState() {
 		for _, player := range h.g.Players {
 			log.Println(player)
 		}
-
 	}
 
 	// TODO: FOR NOW: add a word to the message and stick the new message in broadcast
