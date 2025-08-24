@@ -78,7 +78,7 @@ function main() {
     };
     ws.onmessage = function (e: MessageEvent) {
         console.log();
-        console.log("MSG:", e.data);
+        console.log("RECEIVED:", e.data);
     };
     ws.onopen = function (e) {
         console.log("Connected");
@@ -86,7 +86,8 @@ function main() {
 
     setInterval(() => {
         update(ws);
-    }, FRAME_INTERVAL);
+    }, 1000);
+    // }, FRAME_INTERVAL);
 }
 
 function update(ws: WebSocket) {
@@ -95,6 +96,7 @@ function update(ws: WebSocket) {
     // TODO: every 10 seconds, if there's no message to send, ping the server
     if (ws.readyState === ws.OPEN) {
         ws.send("ping\n");
+        console.log("SENT: 'ping\\n'");
     }
 }
 

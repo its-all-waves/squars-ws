@@ -10,7 +10,7 @@ import (
 )
 
 type Client struct {
-	hub  *Hub
+	hub  *GameHub
 	conn *websocket.Conn
 
 	// buffered channel of outbound messages
@@ -35,18 +35,25 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-func (c *Client) pumpMessagesToHub() {
-	defer func() {
-		c.hub.unregister <- c
-		c.conn.Close()
-	}()
+func (c *Client) setConn() {
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
 		c.conn.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
+}
+
+/* GO ROUTINE */
+func (c *Client) readMessagesIntoHub() {
+	log.Println("CALL readMessagesIntoHub")
+	defer func() {
+		c.hub.unregister <- c
+		c.conn.Close()
+	}()
+	// log.Println("SEE ME?")
 	for {
+		// get one message // TODO: how often? do we for range hub ticker here? or do we move this somewhere else? if we only send from client every tick interval, will that suffice?
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(
@@ -56,11 +63,14 @@ func (c *Client) pumpMessagesToHub() {
 			break
 		}
 		message = bytes.TrimSpace(bytes.ReplaceAll(message, newline, space))
-		c.hub.broadcast <- message
+		log.Println("incoming msg:", string(message))
+		c.hub.incoming <- message
 	}
 }
 
-func (c *Client) pumpMessagesToClient() {
+/* GO ROUTINE */
+func (c *Client) writeBroadcast() {
+	log.Println("CALL writeBroadcast")
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
@@ -83,39 +93,49 @@ func (c *Client) pumpMessagesToClient() {
 			w.Write(message)
 
 			// add queued messages to the current ws message
-			n := len(c.send)
-			for i := 0; i < n; i++ {
+			for range len(c.send) {
 				w.Write(newline)
 				w.Write(<-c.send)
 			}
+			// default: // this line shuts up the lsp
 		}
 	}
 }
 
-type Hub struct {
+type GameHub struct {
+	ticker *time.Ticker
+
 	// register clients
 	clients map[*Client]bool
-
-	// inbound msgs from the clients to broadcast
-	broadcast chan []byte
 
 	// register requests from clients
 	register chan *Client
 
 	unregister chan *Client
+
+	// messages from clients
+	incoming chan []byte
+
+	// outbound game state messages
+	broadcast chan []byte
 }
 
-func newHub() *Hub {
-	return &Hub{
-		broadcast:  make(chan []byte),
+func newGameHub() *GameHub {
+	return &GameHub{
+		ticker: time.NewTicker(time.Second),
+		// ticker:     time.NewTicker(time.Second / 60),
+		clients:    make(map[*Client]bool),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
-		clients:    make(map[*Client]bool),
+		incoming:   make(chan []byte),
+		broadcast:  make(chan []byte),
 	}
 }
 
-func (h *Hub) run() {
+func (h *GameHub) run() {
+	go h.processMessageAndQueueForBroadcast()
 	for {
+
 		select {
 		case client := <-h.register:
 			h.clients[client] = true
@@ -124,7 +144,16 @@ func (h *Hub) run() {
 				delete(h.clients, client)
 				close(client.send)
 			}
+
+		// // if there are incoming messages, process them to update game state
+		// // FOR NOW: simply edit the message and return it to client
+		// case message := <-h.incoming:
+		// 	log.Println("SEE ME?")
+		// 	h.broadcast <- []byte(string(message) + " GOT IT!")
+
+		// if there's something to broadcast, copy it to all clients' send channels
 		case message := <-h.broadcast:
+			// log.Println("PULLING MSG FROM BROADCAST:", string(message))
 			for client := range h.clients {
 				select {
 				case client.send <- message:
@@ -133,20 +162,38 @@ func (h *Hub) run() {
 					delete(h.clients, client)
 				}
 			}
+		case <-h.ticker.C:
+			log.Println("TICK")
+			continue
 		}
 	}
 }
 
-func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+/*
+GO ROUTINE -- OR IS IT??!?!?!?!
+Process incoming messages and populate broadcast channel.
+*/
+func (h *GameHub) processMessageAndQueueForBroadcast() {
+	// TODO: unmarshall messages into game events
+
+	// TODO: FOR NOW: add a word to the message and stick the new message in broadcast
+	for message := range h.incoming {
+		h.broadcast <- []byte(string(message) + " GOT IT!")
+		// TODO: not OK?
+	}
+}
+
+func serveWs(hub *GameHub, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	client := &Client{hub, conn, make(chan []byte, 256)}
-	client.hub.register <- client
+	client.setConn()
 
-	// allow collection of memory referenced by the caller by doing all work in new goroutines
-	go client.pumpMessagesToHub()
-	go client.pumpMessagesToClient()
+	hub.register <- client
+
+	go client.readMessagesIntoHub()
+	go client.writeBroadcast()
 }
