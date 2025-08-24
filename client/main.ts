@@ -1,12 +1,11 @@
-const FRAME_RATE = 60; // not true FPS, but num of times we update per second
-const FRAME_INTERVAL = 1 / FRAME_RATE;
+const TICK_RATE = 60;
+const TICK_INTERVAL = 1 / TICK_RATE;
 
 class Sprite {
     id: string;
     el: HTMLDivElement;
     pos: { x: number; y: number };
     speed: number = 1; // distance per 1 frame
-    screenBounds: { xMax: number; yMax: number };
 
     constructor() {
         const element = document.createElement("div");
@@ -63,18 +62,45 @@ class Sprite {
 
 let sprite: Sprite;
 
-const pressedKeys = new Set();
+type InputState = { up: boolean; down: boolean; left: boolean; right: boolean };
+
+const inputState = {
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+};
+
+const keyPressToInput: Record<
+    Partial<KeyboardEvent["key"]>,
+    keyof InputState
+> = {
+    ArrowUp: "up",
+    ArrowDown: "down",
+    ArrowLeft: "left",
+    ArrowRight: "right",
+    w: "up",
+    s: "down",
+    a: "left",
+    d: "right",
+};
+
+let count = 0;
 
 function main() {
     sprite = new Sprite();
-    addEventListener("keydown", (e) => pressedKeys.add(e.key));
-    addEventListener("keyup", (e) => pressedKeys.delete(e.key));
+    addEventListener("keydown", (e) => {
+        inputState[keyPressToInput[e.key]] = true;
+    });
+    addEventListener("keyup", (e) => {
+        inputState[keyPressToInput[e.key]] = false;
+    });
 
     // set up WS
     console.log("Connecting to websocket...");
     const ws = new WebSocket("ws://" + document.location.host + "/ws");
     ws.onclose = function (e) {
-        alert("Web socket closed!");
+        console.error("Web socket closed!");
     };
     ws.onmessage = function (e: MessageEvent) {
         console.log();
@@ -85,40 +111,38 @@ function main() {
     };
 
     setInterval(() => {
-        update(ws);
+        sendInputState(ws);
+        // }, TICK_INTERVAL);
     }, 1000);
-    // }, FRAME_INTERVAL);
 }
 
-function update(ws: WebSocket) {
+function sendInputState(ws: WebSocket) {
     spriteHandleKeydown();
     // TODO: send a message when the user does something
     // TODO: every 10 seconds, if there's no message to send, ping the server
-    if (ws.readyState === ws.OPEN) {
-        ws.send("ping\n");
-        console.log("SENT: 'ping\\n'");
-    }
-}
-
-type GameEvent = {
-    msg: "PLAYER_MOVED" | "TODO";
-    data: Record<string, string | number>;
-};
-
-function dispatch(e: GameEvent) {
-    switch (e.msg) {
-        case "PLAYER_MOVED":
-            break;
-        case "TODO":
-            break;
-    }
+    const { up, down, left, right } = inputState;
+    const timestampMs = Date.now();
+    ws.send(
+        JSON.stringify({
+            timestampMs,
+            playerId: "0",
+            inputState: { up, down, left, right },
+        }) + "\n",
+    );
+    console.log("sent at: ", String(timestampMs).slice(9));
+    // if (ws.readyState === ws.OPEN) {
+    //     ws.send("ping " + count + "\n");
+    //     console.log("SENT: 'ping\\n'", "COUNT:", count);
+    //     count++;
+    // }
 }
 
 function spriteHandleKeydown() {
-    (pressedKeys.has("ArrowUp") || pressedKeys.has("w")) && sprite.up();
-    (pressedKeys.has("ArrowDown") || pressedKeys.has("s")) && sprite.down();
-    (pressedKeys.has("ArrowLeft") || pressedKeys.has("a")) && sprite.left();
-    (pressedKeys.has("ArrowRight") || pressedKeys.has("d")) && sprite.right();
+    const { up, down, left, right } = inputState;
+    up && sprite.up();
+    down && sprite.down();
+    left && sprite.left();
+    right && sprite.right();
 }
 
 window.onload = main;

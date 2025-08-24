@@ -46,7 +46,6 @@ func (c *Client) setConn() {
 
 /* GO ROUTINE */
 func (c *Client) readMessagesIntoHub() {
-	log.Println("CALL readMessagesIntoHub")
 	defer func() {
 		c.hub.unregister <- c
 		c.conn.Close()
@@ -70,7 +69,6 @@ func (c *Client) readMessagesIntoHub() {
 
 /* GO ROUTINE */
 func (c *Client) writeBroadcast() {
-	log.Println("CALL writeBroadcast")
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
@@ -133,8 +131,10 @@ func newGameHub() *GameHub {
 }
 
 func (h *GameHub) run() {
-	go h.processMessageAndQueueForBroadcast()
-	for {
+	go h.processMessagesAndQueueForBroadcast()
+	for range h.ticker.C {
+
+		log.Println("TICK")
 
 		select {
 		case client := <-h.register:
@@ -144,16 +144,13 @@ func (h *GameHub) run() {
 				delete(h.clients, client)
 				close(client.send)
 			}
+		default:
+		}
 
-		// // if there are incoming messages, process them to update game state
-		// // FOR NOW: simply edit the message and return it to client
-		// case message := <-h.incoming:
-		// 	log.Println("SEE ME?")
-		// 	h.broadcast <- []byte(string(message) + " GOT IT!")
-
+		select {
 		// if there's something to broadcast, copy it to all clients' send channels
 		case message := <-h.broadcast:
-			// log.Println("PULLING MSG FROM BROADCAST:", string(message))
+			log.Println("Pulled msg from broadcast:", string(message))
 			for client := range h.clients {
 				select {
 				case client.send <- message:
@@ -162,9 +159,7 @@ func (h *GameHub) run() {
 					delete(h.clients, client)
 				}
 			}
-		case <-h.ticker.C:
-			log.Println("TICK")
-			continue
+		default:
 		}
 	}
 }
@@ -173,13 +168,13 @@ func (h *GameHub) run() {
 GO ROUTINE -- OR IS IT??!?!?!?!
 Process incoming messages and populate broadcast channel.
 */
-func (h *GameHub) processMessageAndQueueForBroadcast() {
+func (h *GameHub) processMessagesAndQueueForBroadcast() {
 	// TODO: unmarshall messages into game events
 
 	// TODO: FOR NOW: add a word to the message and stick the new message in broadcast
 	for message := range h.incoming {
-		h.broadcast <- []byte(string(message) + " GOT IT!")
-		// TODO: not OK?
+		log.Println("Added msg to broadcast chan:", string(message))
+		h.broadcast <- []byte("GOT IT!" + string(message))
 	}
 }
 
