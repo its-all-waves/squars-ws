@@ -2,19 +2,16 @@ const TICK_RATE = 60;
 const TICK_INTERVAL = 1 / TICK_RATE;
 
 class Sprite {
-    id: string;
+    playerId: string;
     el: HTMLDivElement;
     pos: { x: number; y: number };
     speed: number = 1; // distance per 1 frame
 
     constructor() {
-        const element = document.createElement("div");
-        element.className = "sprite";
-
-        // TODO: give unique ID -- is element id and sprite id
-        this.id = element.id = "sprite";
-
-        this.el = element;
+        const el = document.createElement("div");
+        el.className = "sprite";
+        el.id = "sprite";
+        this.el = el;
         this.center();
         document.body.append(this.el);
     }
@@ -29,6 +26,10 @@ class Sprite {
     private setPos() {
         const { x, y } = this.el.getBoundingClientRect();
         this.pos = { x, y };
+    }
+
+    setPlayerId(val: string) {
+        this.el.id = this.playerId = val;
     }
 
     up() {
@@ -85,16 +86,8 @@ const keyPressToInput: Record<
     d: "right",
 };
 
-let count = 0;
-
-function main() {
+async function main() {
     sprite = new Sprite();
-    addEventListener("keydown", (e) => {
-        inputState[keyPressToInput[e.key]] = true;
-    });
-    addEventListener("keyup", (e) => {
-        inputState[keyPressToInput[e.key]] = false;
-    });
 
     // set up WS
     console.log("Connecting to websocket...");
@@ -103,38 +96,45 @@ function main() {
         console.error("Web socket closed!");
     };
     ws.onmessage = function (e: MessageEvent) {
-        console.log();
-        console.log("RECEIVED:", e.data);
+        const msgObj = JSON.parse(e.data);
+        console.log("RECEIVED:", msgObj);
+
+        const { playerId } = msgObj;
+        playerId && sprite.setPlayerId(playerId);
     };
     ws.onopen = function (e) {
         console.log("Connected");
     };
 
+    addEventListener("keydown", (e) => {
+        if (!(e.key in keyPressToInput)) return;
+        inputState[keyPressToInput[e.key]] = true;
+        sendGameEvent(ws);
+    });
+    addEventListener("keyup", (e) => {
+        if (!(e.key in keyPressToInput)) return;
+        inputState[keyPressToInput[e.key]] = false;
+        sendGameEvent(ws);
+    });
+
+    console.log("yup");
     setInterval(() => {
-        sendInputState(ws);
+        if (ws.readyState !== ws.OPEN) return;
+        if (!sprite.playerId) return;
+        spriteHandleKeydown(); // TODO: will be gone when server takes over
+        // sendGameEvents(ws);
         // }, TICK_INTERVAL);
     }, 1000);
+    // }
 }
 
-function sendInputState(ws: WebSocket) {
-    spriteHandleKeydown();
+function sendGameEvent(ws: WebSocket) {
     // TODO: send a message when the user does something
     // TODO: every 10 seconds, if there's no message to send, ping the server
-    const { up, down, left, right } = inputState;
+    const { playerId } = sprite;
     const timestampMs = Date.now();
-    ws.send(
-        JSON.stringify({
-            timestampMs,
-            playerId: "0",
-            inputState: { up, down, left, right },
-        }) + "\n",
-    );
+    ws.send(JSON.stringify({ timestampMs, playerId, inputState }) + "\n");
     console.log("sent at: ", String(timestampMs).slice(9));
-    // if (ws.readyState === ws.OPEN) {
-    //     ws.send("ping " + count + "\n");
-    //     console.log("SENT: 'ping\\n'", "COUNT:", count);
-    //     count++;
-    // }
 }
 
 function spriteHandleKeydown() {

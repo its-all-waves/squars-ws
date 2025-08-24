@@ -2,16 +2,21 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
+	"web-socket-game/game"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
 type Client struct {
-	hub  *GameHub
-	conn *websocket.Conn
+	playerId string
+	hub      *GameHub
+	conn     *websocket.Conn
 
 	// buffered channel of outbound messages
 	send chan []byte
@@ -62,13 +67,13 @@ func (c *Client) readMessagesIntoHub() {
 			break
 		}
 		message = bytes.TrimSpace(bytes.ReplaceAll(message, newline, space))
-		log.Println("incoming msg:", string(message))
+		// log.Println("incoming msg:", string(message))
 		c.hub.incoming <- message
 	}
 }
 
 /* GO ROUTINE */
-func (c *Client) writeBroadcast() {
+func (c *Client) writeMessagesFromSendChan() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
@@ -79,7 +84,7 @@ func (c *Client) writeBroadcast() {
 		case message, ok := <-c.send:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				// the hub closed the channel
+				// The hub closed the channel.
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
@@ -95,13 +100,23 @@ func (c *Client) writeBroadcast() {
 				w.Write(newline)
 				w.Write(<-c.send)
 			}
-			// default: // this line shuts up the lsp
+
+			if err := w.Close(); err != nil {
+				return
+			}
+		case <-ticker.C:
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
 		}
 	}
 }
 
 type GameHub struct {
 	ticker *time.Ticker
+
+	g *game.Game
 
 	// register clients
 	clients map[*Client]bool
@@ -122,6 +137,7 @@ func newGameHub() *GameHub {
 	return &GameHub{
 		ticker: time.NewTicker(time.Second),
 		// ticker:     time.NewTicker(time.Second / 60),
+		g:          game.New(),
 		clients:    make(map[*Client]bool),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
@@ -131,19 +147,19 @@ func newGameHub() *GameHub {
 }
 
 func (h *GameHub) run() {
-	go h.processMessagesAndQueueForBroadcast()
+	go h.updateGameState()
 	for range h.ticker.C {
 
-		log.Println("TICK")
+		// log.Println("TICK")
 
+		// TODO: load up the broadcast channel
+		gState := h.g
+		gStateMsg, err := json.Marshal(gState)
+		if err != nil {
+			log.Println("Couldn't convert game state to json.")
+		}
 		select {
-		case client := <-h.register:
-			h.clients[client] = true
-		case client := <-h.unregister:
-			if _, ok := h.clients[client]; ok {
-				delete(h.clients, client)
-				close(client.send)
-			}
+		case h.broadcast <- gStateMsg:
 		default:
 		}
 
@@ -161,21 +177,73 @@ func (h *GameHub) run() {
 			}
 		default:
 		}
+
+		select {
+		case client := <-h.register:
+			h.clients[client] = true
+			h.g.AddPlayer(client.playerId)
+		case client := <-h.unregister:
+			h.g.RemovePlayer(client.playerId)
+			if _, ok := h.clients[client]; ok {
+				delete(h.clients, client)
+				close(client.send)
+			}
+		default:
+		}
+
 	}
 }
 
 /*
-GO ROUTINE -- OR IS IT??!?!?!?!
-Process incoming messages and populate broadcast channel.
+GO ROUTINE
+Process all messages for a tick, then load final game state into broadcast channel.
 */
-func (h *GameHub) processMessagesAndQueueForBroadcast() {
+func (h *GameHub) updateGameState() {
 	// TODO: unmarshall messages into game events
+	// TODO: sort messages in queue
+
+	/*
+		THE GOAL: for each queued incoming msg, send it through game for processing. once processed each one, send the final game state for this tick
+	*/
+
+	for {
+		// when there's a message, unmarshal it, and send it to the game to update its state
+		message, ok := <-h.incoming
+		if !ok {
+			// TODO:
+			log.Println("What does this mean? Channel closed? So do we return? RETURNING!")
+			return
+		}
+
+		log.Println("PULLED MSG FROM INCOMING:", string(message))
+
+		event := game.GameEvent{}
+		err := json.Unmarshal(message, &event)
+
+		log.Println("GAME EVENT CONVERTED FROM MESSAGE:", event)
+
+		if err != nil {
+			// TODO: handle error -- probably bubble up error
+			log.Println("Couldn't convert ws message to game event:", err)
+			continue
+		}
+		h.g.Update(event)
+
+		// DEBUG
+		log.Printf("GAME STATE:")
+		log.Println("Players:")
+		for _, player := range h.g.Players {
+			log.Println(player)
+		}
+
+	}
 
 	// TODO: FOR NOW: add a word to the message and stick the new message in broadcast
-	for message := range h.incoming {
-		log.Println("Added msg to broadcast chan:", string(message))
-		h.broadcast <- []byte("GOT IT!" + string(message))
-	}
+	// for message := range h.incoming {
+
+	// log.Println("Added msg to broadcast chan:", string(message))
+	// h.broadcast <- []byte("GOT IT!" + string(message))
+	// }
 }
 
 func serveWs(hub *GameHub, w http.ResponseWriter, r *http.Request) {
@@ -184,11 +252,15 @@ func serveWs(hub *GameHub, w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	client := &Client{hub, conn, make(chan []byte, 256)}
-	client.setConn()
 
+	playerId := uuid.New().String()
+	client := &Client{playerId, hub, conn, make(chan []byte, 256)}
+	client.setConn()
 	hub.register <- client
 
+	idMsg := fmt.Appendf(nil, `{ "playerId": "%v" }`, playerId)
+	client.send <- idMsg
+
 	go client.readMessagesIntoHub()
-	go client.writeBroadcast()
+	go client.writeMessagesFromSendChan()
 }
