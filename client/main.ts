@@ -1,80 +1,8 @@
-const TICK_RATE = 60;
-const TICK_INTERVAL = 1 / TICK_RATE;
+import * as s from "./sprite";
 
-class Sprite {
-    playerId: string;
-    el: HTMLDivElement;
-    pos: { x: number; y: number };
-    speed: number = 1; // distance per 1 frame
-
-    constructor() {
-        const el = document.createElement("div");
-        el.className = "sprite";
-        el.id = "sprite";
-        this.el = el;
-        this.center();
-        document.body.append(this.el);
-    }
-
-    private center() {
-        this.el.style.left = "50%";
-        this.el.style.top = "50%";
-        const { x, y } = this.el.getBoundingClientRect();
-        this.pos = { x, y };
-    }
-
-    setPos(x: number, y: number) {
-        this.el.style.left = String(x) + "px";
-        this.el.style.top = String(y) + "px";
-    }
-
-    setPlayerId(val: string) {
-        this.el.id = this.playerId = val;
-    }
-
-    up() {
-        console.log("up");
-        const currTop = getComputedStyle(this.el).top;
-        const topPos = Number(currTop.replace("px", "")) - this.speed;
-        this.el.style.top = topPos + "px";
-    }
-
-    down() {
-        console.log("down");
-        const currTop = getComputedStyle(this.el).top;
-        const topPos = Number(currTop.replace("px", "")) + this.speed;
-        this.el.style.top = topPos + "px";
-    }
-
-    left() {
-        console.log("left");
-        const currLeft = getComputedStyle(this.el).left;
-        const leftPos = Number(currLeft.replace("px", "")) - this.speed;
-        this.el.style.left = leftPos + "px";
-    }
-
-    right() {
-        console.log("right");
-        const currLeft = getComputedStyle(this.el).left;
-        const leftPos = Number(currLeft.replace("px", "")) + this.speed;
-        this.el.style.left = leftPos + "px";
-    }
-}
-
-let sprite: Sprite;
-
-type InputState = { up: boolean; down: boolean; left: boolean; right: boolean };
-
-const inputState = {
-    up: false,
-    down: false,
-    left: false,
-    right: false,
-};
-
-const keyPressToInput: Record<
+const KEY_PRESS_TO_INPUT: Record<
     Partial<KeyboardEvent["key"]>,
-    keyof InputState
+    keyof s.InputState
 > = {
     ArrowUp: "up",
     ArrowDown: "down",
@@ -86,18 +14,15 @@ const keyPressToInput: Record<
     d: "right",
 };
 
-type PlayerId = string;
-type Player = { id: string; x: number; y: number };
-type Players = Record<PlayerId, Player>;
-
-type IdMessage = { playerId: PlayerId };
+type IdMessage = { playerId: s.PlayerId };
 type GameStateMessage = { players: Players };
+type Players = Record<s.PlayerId, s.Player>;
 
 async function main() {
-    sprite = new Sprite();
+    let sprite = new s.Sprite();
 
     // DEBUG
-    window.sprite = sprite;
+    // window.sprite = sprite;
 
     // set up WS
     console.log("Connecting to websocket...");
@@ -125,32 +50,23 @@ async function main() {
     };
 
     addEventListener("keydown", (e) => {
-        if (!(e.key in keyPressToInput)) return;
-        inputState[keyPressToInput[e.key]] = true;
-        sendGameEvent(ws);
+        if (!(e.key in KEY_PRESS_TO_INPUT)) return;
+        sprite.inputState[KEY_PRESS_TO_INPUT[e.key]] = true;
+        sendGameEvent(ws, sprite);
     });
     addEventListener("keyup", (e) => {
-        if (!(e.key in keyPressToInput)) return;
-        inputState[keyPressToInput[e.key]] = false;
-        sendGameEvent(ws);
+        if (!(e.key in KEY_PRESS_TO_INPUT)) return;
+        sprite.inputState[KEY_PRESS_TO_INPUT[e.key]] = false;
+        sendGameEvent(ws, sprite);
     });
 }
 
-function sendGameEvent(ws: WebSocket) {
-    // TODO: send a message when the user does something
+function sendGameEvent(ws: WebSocket, sprite: s.Sprite) {
     // TODO: every 10 seconds, if there's no message to send, ping the server
-    const { playerId } = sprite;
+    const { playerId, inputState } = sprite;
     const timestampMs = Date.now();
     ws.send(JSON.stringify({ timestampMs, playerId, inputState }) + "\n");
     // console.log("sent at: ", String(timestampMs).slice(9));
-}
-
-function spriteHandleKeydown() {
-    const { up, down, left, right } = inputState;
-    up && sprite.up();
-    down && sprite.down();
-    left && sprite.left();
-    right && sprite.right();
 }
 
 window.onload = main;
