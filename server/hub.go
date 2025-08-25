@@ -23,6 +23,7 @@ type Client struct {
 }
 
 const (
+	// TODO: FIX: client dropping connection after writeWait
 	/* DEBUG */ writeWait = 300 * time.Second // period within which client must message back
 	// writeWait      = 60 * time.Second // period within which client must message back
 	pongWait       = 60 * time.Second
@@ -116,9 +117,9 @@ func (c *Client) writeMessagesFromSendChan() {
 }
 
 type GameHub struct {
-	ticker *time.Ticker
-
 	g *game.Game
+
+	ticker *time.Ticker
 
 	// register clients
 	clients map[*Client]bool
@@ -137,9 +138,8 @@ type GameHub struct {
 
 func newGameHub() *GameHub {
 	return &GameHub{
-		ticker: time.NewTicker(time.Second),
-		// ticker:     time.NewTicker(time.Second / 60),
 		g:          game.New(),
+		ticker:     time.NewTicker(time.Second / time.Duration(game.Settings.TickRate)),
 		clients:    make(map[*Client]bool),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),

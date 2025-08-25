@@ -2,7 +2,7 @@ package game
 
 import "log"
 
-type position = uint16
+type position = int
 
 type fieldSize struct {
 	x position
@@ -91,17 +91,19 @@ func (g *Game) Update(e GameEvent) {
 	// TODO: does this cause a race condition?
 
 	// log.Println("GAME EVENT:", e)
+
+	// NOTE: inverted directions like css
 	if e.InputState.Up {
-		g.Players[e.PlayerId].Y += Settings.PlayerSpeed
-	}
-	if e.InputState.Down {
 		g.Players[e.PlayerId].Y -= Settings.PlayerSpeed
 	}
+	if e.InputState.Down {
+		g.Players[e.PlayerId].Y += Settings.PlayerSpeed
+	}
 	if e.InputState.Left {
-		g.Players[e.PlayerId].X += Settings.PlayerSpeed
+		g.Players[e.PlayerId].X -= Settings.PlayerSpeed
 	}
 	if e.InputState.Right {
-		g.Players[e.PlayerId].X -= Settings.PlayerSpeed
+		g.Players[e.PlayerId].X += Settings.PlayerSpeed
 	}
 	// TODO: stop movement past field bounds
 
