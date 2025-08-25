@@ -1,35 +1,35 @@
-const FRAME_RATE = 60; // not true FPS, but num of times we update per second
-const FRAME_INTERVAL = 1 / FRAME_RATE;
+const TICK_RATE = 60;
+const TICK_INTERVAL = 1 / TICK_RATE;
 
 class Sprite {
-    id: string;
+    playerId: string;
     el: HTMLDivElement;
     pos: { x: number; y: number };
     speed: number = 1; // distance per 1 frame
-    screenBounds: { xMax: number; yMax: number };
 
     constructor() {
-        const element = document.createElement("div");
-        element.className = "sprite";
-
-        // TODO: give unique ID -- is element id and sprite id
-        this.id = element.id = "sprite";
-
-        this.el = element;
+        const el = document.createElement("div");
+        el.className = "sprite";
+        el.id = "sprite";
+        this.el = el;
         this.center();
         document.body.append(this.el);
     }
 
     private center() {
-        this.el.style.top = "50%";
         this.el.style.left = "50%";
-        this.el.style.translate = "-50% -50%";
-        this.setPos();
-    }
-
-    private setPos() {
+        this.el.style.top = "50%";
         const { x, y } = this.el.getBoundingClientRect();
         this.pos = { x, y };
+    }
+
+    setPos(x: number, y: number) {
+        this.el.style.left = String(x) + "px";
+        this.el.style.top = String(y) + "px";
+    }
+
+    setPlayerId(val: string) {
+        this.el.id = this.playerId = val;
     }
 
     up() {
@@ -63,18 +63,19 @@ class Sprite {
 
 let sprite: Sprite;
 
-const pressedKeys: Set<string> = new Set();
-
-type PlayerId = string;
-type Timestamp = number;
 type InputState = { up: boolean; down: boolean; left: boolean; right: boolean };
-type GameEventMsg = {
-    timestampMs: Timestamp;
-    playerId: PlayerId;
-    inputState: InputState;
+
+const inputState = {
+    up: false,
+    down: false,
+    left: false,
+    right: false,
 };
 
-const keyPressMap = {
+const keyPressToInput: Record<
+    Partial<KeyboardEvent["key"]>,
+    keyof InputState
+> = {
     ArrowUp: "up",
     ArrowDown: "down",
     ArrowLeft: "left",
@@ -85,10 +86,18 @@ const keyPressMap = {
     d: "right",
 };
 
-function main() {
+type PlayerId = string;
+type Player = { id: string; x: number; y: number };
+type Players = Record<PlayerId, Player>;
+
+type IdMessage = { playerId: PlayerId };
+type GameStateMessage = { players: Players };
+
+async function main() {
     sprite = new Sprite();
-    addEventListener("keydown", (e) => pressedKeys.add(keyPressMap[e.key]));
-    addEventListener("keyup", (e) => pressedKeys.delete(keyPressMap[e.key]));
+
+    // DEBUG
+    window.sprite = sprite;
 
     // set up WS
     console.log("Connecting to websocket...");
@@ -97,68 +106,51 @@ function main() {
         console.error("Web socket closed!");
     };
     ws.onmessage = function (e: MessageEvent) {
-        console.log();
-        console.log("MSG:", e.data);
+        const msgObj: IdMessage | GameStateMessage = JSON.parse(e.data);
+        // console.log("RECEIVED:", msgObj);
+
+        const { playerId } = msgObj as IdMessage;
+        playerId && sprite.setPlayerId(playerId);
+
+        let { players } = msgObj as GameStateMessage;
+        if (players) {
+            // TODO: update alll player positions
+            // FOR NOW: update just my position
+            const { x, y } = players[sprite.playerId];
+            sprite.setPos(x, y);
+        }
     };
     ws.onopen = function (e) {
         console.log("Connected");
     };
 
-    setInterval(() => {
-        // convert pressed keys to { up, down, left, right: bool }
-        ws.send(
-            JSON.stringify({
-                timestampMs: Date.now(),
-                playerId: "0",
-                inputState: {
-                    up: pressedKeys.has("up"),
-                    down: pressedKeys.has("down"),
-                    left: pressedKeys.has("left"),
-                    right: pressedKeys.has("right"),
-                },
-            }) + "\n",
-        );
-        console.log("sent message");
-    }, 1000);
-    // }, FRAME_INTERVAL);
+    addEventListener("keydown", (e) => {
+        if (!(e.key in keyPressToInput)) return;
+        inputState[keyPressToInput[e.key]] = true;
+        sendGameEvent(ws);
+    });
+    addEventListener("keyup", (e) => {
+        if (!(e.key in keyPressToInput)) return;
+        inputState[keyPressToInput[e.key]] = false;
+        sendGameEvent(ws);
+    });
 }
 
-// function update(ws: WebSocket) {
-//     spriteHandleKeydown();
-//     // TODO: send a message when the user does something
-//     // TODO: every 10 seconds, if there's no message to send, ping the server
-//     if (ws.readyState === ws.OPEN) {
-//         ws.send("ping\n");
-//     }
-// }
-
-type GameEvent = {
-    msg: "PLAYER_MOVED" | "TODO";
-    data: Record<string, string | number>;
-};
-
-function dispatch(e: GameEvent) {
-    switch (e.msg) {
-        case "PLAYER_MOVED":
-            break;
-        case "TODO":
-            break;
-    }
+function sendGameEvent(ws: WebSocket) {
+    // TODO: send a message when the user does something
+    // TODO: every 10 seconds, if there's no message to send, ping the server
+    const { playerId } = sprite;
+    const timestampMs = Date.now();
+    ws.send(JSON.stringify({ timestampMs, playerId, inputState }) + "\n");
+    // console.log("sent at: ", String(timestampMs).slice(9));
 }
 
-// function spriteHandleKeydown(ws: WebSocket) {
-//     if (pressedKeys.has("ArrowUp") || pressedKeys.has("w")) {
-//         sprite.up();
-//     }
-//     if (pressedKeys.has("ArrowDown") || pressedKeys.has("s")) {
-//         sprite.down();
-//     }
-//     if (pressedKeys.has("ArrowLeft") || pressedKeys.has("a")) {
-//         sprite.left();
-//     }
-//     if (pressedKeys.has("ArrowRight") || pressedKeys.has("d")) {
-//         sprite.right();
-//     }
-// }
+function spriteHandleKeydown() {
+    const { up, down, left, right } = inputState;
+    up && sprite.up();
+    down && sprite.down();
+    left && sprite.left();
+    right && sprite.right();
+}
 
 window.onload = main;
