@@ -14,35 +14,33 @@ const KEY_PRESS_TO_INPUT: Record<
     d: "right",
 };
 
-type IdMessage = { playerId: s.PlayerId };
-type GameStateMessage = { players: Players };
+type IdObj = { playerId: s.PlayerId };
+type GameStateObj = { players: Players };
 type Players = Record<s.PlayerId, s.Player>;
 
-async function main() {
-    let sprite = new s.Sprite();
+let sprite = new s.Sprite();
+const ws = new WebSocket("ws://" + document.location.host + "/ws");
+let gameState: GameStateObj;
 
+async function main() {
     // DEBUG
     // window.sprite = sprite;
 
     // set up WS
     console.log("Connecting to websocket...");
-    const ws = new WebSocket("ws://" + document.location.host + "/ws");
     ws.onclose = function (e) {
         console.error("Web socket closed!");
     };
     ws.onmessage = function (e: MessageEvent) {
-        const msgObj: IdMessage | GameStateMessage = JSON.parse(e.data);
+        const msgObj: IdObj | GameStateObj = JSON.parse(e.data);
         // console.log("RECEIVED:", msgObj);
 
-        const { playerId } = msgObj as IdMessage;
+        const { playerId } = msgObj as IdObj;
         playerId && sprite.setPlayerId(playerId);
 
-        let { players } = msgObj as GameStateMessage;
+        let { players } = msgObj as GameStateObj;
         if (players) {
-            // TODO: update alll player positions
-            // FOR NOW: update just my position
-            const { x, y } = players[sprite.playerId];
-            sprite.setPos(x, y);
+            gameState = msgObj as GameStateObj;
         }
     };
     ws.onopen = function (e) {
@@ -52,13 +50,12 @@ async function main() {
     addEventListener("keydown", (e) => {
         if (!(e.key in KEY_PRESS_TO_INPUT)) return;
         sprite.inputState[KEY_PRESS_TO_INPUT[e.key]] = true;
-        sendGameEvent(ws, sprite);
     });
     addEventListener("keyup", (e) => {
         if (!(e.key in KEY_PRESS_TO_INPUT)) return;
         sprite.inputState[KEY_PRESS_TO_INPUT[e.key]] = false;
-        sendGameEvent(ws, sprite);
     });
+    gameLoop();
 }
 
 function sendGameEvent(ws: WebSocket, sprite: s.Sprite) {
@@ -67,6 +64,20 @@ function sendGameEvent(ws: WebSocket, sprite: s.Sprite) {
     const timestampMs = Date.now();
     ws.send(JSON.stringify({ timestampMs, playerId, inputState }) + "\n");
     // console.log("sent at: ", String(timestampMs).slice(9));
+}
+
+function gameLoop() {
+    const { up, down, left, right } = sprite.inputState;
+    if (up || down || left || right) {
+        sendGameEvent(ws, sprite);
+    }
+    if (gameState) {
+        // TODO: update all player positions
+        // FOR NOW: update just my position
+        const { x, y } = gameState.players[sprite.playerId];
+        sprite.setPos(x, y);
+    }
+    requestAnimationFrame(gameLoop);
 }
 
 window.onload = main;

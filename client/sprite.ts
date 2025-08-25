@@ -74,7 +74,7 @@ export class Sprite {
         this.el.style.left = leftPos + "px";
     }
 
-    spriteHandleInput() {
+    handleInput() {
         const { up, down, left, right } = this.inputState;
         up && this.up();
         down && this.down();

@@ -56,7 +56,6 @@ func (c *Client) readMessagesIntoHub() {
 		c.hub.unregister <- c
 		c.conn.Close()
 	}()
-	// log.Println("SEE ME?")
 	for {
 		// get one message // TODO: how often? do we for range hub ticker here? or do we move this somewhere else? if we only send from client every tick interval, will that suffice?
 		_, message, err := c.conn.ReadMessage()
@@ -208,12 +207,12 @@ func (h *GameHub) updateGameState() {
 			return
 		}
 
-		log.Println("PULLED MSG FROM INCOMING:", string(message))
+		// log.Println("PULLED MSG FROM INCOMING:", string(message))
 
 		event := game.GameEvent{}
 		err := json.Unmarshal(message, &event)
 
-		log.Println("GAME EVENT CONVERTED FROM MESSAGE:", event)
+		// log.Println("GAME EVENT CONVERTED FROM MESSAGE:", event)
 
 		if err != nil {
 			// TODO: handle error -- probably bubble up error
@@ -221,13 +220,6 @@ func (h *GameHub) updateGameState() {
 			continue
 		}
 		h.g.Update(event)
-
-		// DEBUG
-		log.Printf("GAME STATE:")
-		log.Println("Players:")
-		for _, player := range h.g.Players {
-			log.Println(player)
-		}
 	}
 
 	// TODO: FOR NOW: add a word to the message and stick the new message in broadcast

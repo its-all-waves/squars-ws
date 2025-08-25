@@ -16,7 +16,7 @@ var Settings = struct {
 }{
 	TickRate:    60,
 	FieldSize:   fieldSize{300, 300},
-	PlayerSpeed: 10,
+	PlayerSpeed: 5,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -108,5 +108,5 @@ func (g *Game) Update(e GameEvent) {
 	// TODO: stop movement past field bounds
 
 	// ... hub will serialize and send, and handle closing the event channel
-	log.Println("UPDATED GAME STATE")
+	// log.Println("UPDATED GAME STATE")
 }
