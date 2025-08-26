@@ -36,18 +36,16 @@ async function main() {
     addEventListener("keydown", (e) => sprite.input(e.key, true));
     addEventListener("keyup", (e) => sprite.input(e.key, false));
 
-    await waitForPlayerId(() => !!sprite.playerId);
+    await waitFor(200, () => sprite.playerId && !!gameState);
 
     gameLoop();
 }
 
-function waitForPlayerId(havePlayerId: () => boolean) {
+function waitFor(durationMs: number, have: () => boolean) {
     return new Promise((resolve) => {
         function check() {
-            if (havePlayerId()) {
-                resolve();
-            }
-            setTimeout(check, 200);
+            have() && resolve();
+            setTimeout(check, durationMs);
         }
         check();
     });
@@ -61,11 +59,20 @@ function sendGameEvent(ws: WebSocket, sprite: s.Sprite) {
     // console.log("sent at: ", String(timestampMs).slice(9));
 }
 
-function gameLoop() {
+async function gameLoop() {
+    // // TODO: will this work? can i call an async function from re
+    // if (ws.readyState !== ws.OPEN) {
+    //     await waitForPlayerId(() => !!sprite.playerId);
+    // }
+
+    // NOTE: This appears incorrect, because we're not ackowledging key ups,
+    // but the server adjusts player position per event. If everything was
+    // false, the server wouldn't move the player anyway.
     const { up, down, left, right } = sprite.inputState;
     if (up || down || left || right) {
         sendGameEvent(ws, sprite);
     }
+
     if (gameState) {
         // TODO: update all player positions
         // FOR NOW: update just my position
