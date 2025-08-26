@@ -55,7 +55,22 @@ async function main() {
         if (!(e.key in KEY_PRESS_TO_INPUT)) return;
         sprite.inputState[KEY_PRESS_TO_INPUT[e.key]] = false;
     });
+
+    await waitForPlayerId(() => !!sprite.playerId);
+
     gameLoop();
+}
+
+function waitForPlayerId(havePlayerId: () => boolean) {
+    return new Promise((resolve) => {
+        function check() {
+            if (havePlayerId()) {
+                resolve();
+            }
+            setTimeout(check, 200);
+        }
+        check();
+    });
 }
 
 function sendGameEvent(ws: WebSocket, sprite: s.Sprite) {
