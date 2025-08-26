@@ -1,19 +1,5 @@
 import * as s from "./sprite";
 
-const KEY_PRESS_TO_INPUT: Record<
-    Partial<KeyboardEvent["key"]>,
-    keyof s.InputState
-> = {
-    ArrowUp: "up",
-    ArrowDown: "down",
-    ArrowLeft: "left",
-    ArrowRight: "right",
-    w: "up",
-    s: "down",
-    a: "left",
-    d: "right",
-};
-
 type IdObj = { playerId: s.PlayerId };
 type GameStateObj = { players: Players };
 type Players = Record<s.PlayerId, s.Player>;
@@ -38,7 +24,7 @@ async function main() {
         const { playerId } = msgObj as IdObj;
         playerId && sprite.setPlayerId(playerId);
 
-        let { players } = msgObj as GameStateObj;
+        const { players } = msgObj as GameStateObj;
         if (players) {
             gameState = msgObj as GameStateObj;
         }
@@ -47,14 +33,8 @@ async function main() {
         console.log("Connected");
     };
 
-    addEventListener("keydown", (e) => {
-        if (!(e.key in KEY_PRESS_TO_INPUT)) return;
-        sprite.inputState[KEY_PRESS_TO_INPUT[e.key]] = true;
-    });
-    addEventListener("keyup", (e) => {
-        if (!(e.key in KEY_PRESS_TO_INPUT)) return;
-        sprite.inputState[KEY_PRESS_TO_INPUT[e.key]] = false;
-    });
+    addEventListener("keydown", (e) => sprite.input(e.key, true));
+    addEventListener("keyup", (e) => sprite.input(e.key, false));
 
     await waitForPlayerId(() => !!sprite.playerId);
 

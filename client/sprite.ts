@@ -8,6 +8,20 @@ export type InputState = {
     right: boolean;
 };
 
+const KEY_PRESS_TO_INPUT: Record<
+    Partial<KeyboardEvent["key"]>,
+    keyof s.InputState
+> = {
+    ArrowUp: "up",
+    ArrowDown: "down",
+    ArrowLeft: "left",
+    ArrowRight: "right",
+    w: "up",
+    s: "down",
+    a: "left",
+    d: "right",
+};
+
 export class Sprite {
     playerId: PlayerId;
     el: HTMLDivElement;
@@ -44,6 +58,11 @@ export class Sprite {
 
     setPlayerId(val: string) {
         this.el.id = this.playerId = val;
+    }
+
+    input(key: KeyboardEvent["key"], keyState: boolean) {
+        if (!(key in KEY_PRESS_TO_INPUT)) return;
+        this.inputState[KEY_PRESS_TO_INPUT[key]] = keyState;
     }
 
     up() {
