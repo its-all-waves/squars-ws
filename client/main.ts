@@ -14,10 +14,10 @@ async function main() {
 
     // set up WS
     console.log("Connecting to websocket...");
-    ws.onclose = function (e) {
-        console.error("Web socket closed!");
-    };
-    ws.onmessage = function (e: MessageEvent) {
+
+    ws.onclose = () => console.error("Web socket closed!");
+
+    ws.onmessage = (e: MessageEvent) => {
         const msgObj: IdObj | GameStateObj = JSON.parse(e.data);
         // console.log("RECEIVED:", msgObj);
 
@@ -29,9 +29,8 @@ async function main() {
             gameState = msgObj as GameStateObj;
         }
     };
-    ws.onopen = function (e) {
-        console.log("Connected");
-    };
+
+    ws.onopen = () => console.log("Connected");
 
     addEventListener("keydown", (e) => sprite.input(e.key, true));
     addEventListener("keyup", (e) => sprite.input(e.key, false));
@@ -44,6 +43,7 @@ async function main() {
 function waitFor(durationMs: number, have: () => boolean) {
     return new Promise((resolve) => {
         function check() {
+            // @ts-ignore
             have() && resolve();
             setTimeout(check, durationMs);
         }
