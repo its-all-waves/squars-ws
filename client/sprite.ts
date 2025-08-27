@@ -48,7 +48,7 @@ export class Sprite {
         const el = document.createElement("div");
         el.className = "sprite";
         this.el = el;
-        x && y ? this.setPos(x, y) : this.center();
+        x && y ? this.setPos(x, y) : this.setPos(0, 0);
         playerId && this.setPlayerId(playerId);
         field.append(el);
     }
@@ -57,13 +57,14 @@ export class Sprite {
         this.el.remove();
     }
 
-    private center() {
-        this.el.style.left = "50%";
-        this.el.style.top = "50%";
-        const { x, y } = this.el.getBoundingClientRect();
-        this.x = x;
-        this.y = y;
-    }
+    // private center() {
+    //     this.el.style.left = "50%";
+    //     this.el.style.top = "50%";
+    //     this.el.style.translate = "-50% -50%"; // makes the point of ref the center of the square
+    //     const { x, y } = this.el.getBoundingClientRect();
+    //     this.x = x;
+    //     this.y = y;
+    // }
 
     setPos(x: number, y: number) {
         this.el.style.left = String(x) + "px";

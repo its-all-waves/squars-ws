@@ -8,9 +8,10 @@ Game logic is on the server, for now, with no optimistic or predictive updating 
 
 - [x] render other players
 - [ ] deal with boundaries
-    - [ ] establish game bounds in server and communicate to client
-    - [ ] loop around OR stop at wall
-- [ ] start with sprite centered
+    - [-] establish game bounds in server
+        - [ ] communicate to client
+    - [x] loop around OR stop at wall
+- [ ] player starts at random position with random color
 
 ## TODO :: Issues
 

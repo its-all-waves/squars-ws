@@ -4,19 +4,21 @@ import "log"
 
 type position = int
 
-type fieldSize struct {
+type size struct {
 	x position
 	y position
 }
 
 var Settings = struct {
 	TickRate    uint8
-	FieldSize   fieldSize // dimensions of the field
-	PlayerSpeed position  // pixels traveled per tick
+	FieldSize   size // dimensions of the field
+	SpriteSize  size
+	PlayerSpeed position // pixels traveled per tick
 }{
 	TickRate:    60,
-	FieldSize:   fieldSize{300, 300},
-	PlayerSpeed: 5,
+	FieldSize:   size{600, 600}, // TODO: share with client
+	SpriteSize:  size{100, 100},
+	PlayerSpeed: 7,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -59,10 +61,6 @@ type GameEvent struct {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/* TODO:
-client sends only input state and timestamp
-*/
-
 type Game struct {
 	Players players `json:"players"`
 }
@@ -85,25 +83,28 @@ func (g *Game) RemovePlayer(playerId string) {
 	delete(g.Players, playerId)
 }
 
-/* Set the fields of Game, given a queue of GameEvents */
+/*
+Set the fields of Game, given a queue of GameEvents
+TODO: pre-sort inputs?
+TODO: sprite:sprite collision detection
+*/
 func (g *Game) Update(e GameEvent) {
-	// TODO: pre-sort inputs?
-	// TODO: stop movement past field bounds / collision detection
-
-	// DEBUG
-	// log.Println("GAME EVENT:", e)
+	player := g.Players[e.PlayerId]
+	speed := Settings.PlayerSpeed
+	fieldSize := Settings.FieldSize
+	spriteSize := Settings.SpriteSize
 
 	// NOTE: inverted directions like css
 	if e.InputState.Up {
-		g.Players[e.PlayerId].Y -= Settings.PlayerSpeed
+		player.Y = max(player.Y-speed, 0)
 	}
 	if e.InputState.Down {
-		g.Players[e.PlayerId].Y += Settings.PlayerSpeed
+		player.Y = min(player.Y+speed, fieldSize.y-spriteSize.y)
 	}
 	if e.InputState.Left {
-		g.Players[e.PlayerId].X -= Settings.PlayerSpeed
+		player.X = max(player.X-speed, 0)
 	}
 	if e.InputState.Right {
-		g.Players[e.PlayerId].X += Settings.PlayerSpeed
+		player.X = min(player.X+speed, fieldSize.y-spriteSize.y)
 	}
 }

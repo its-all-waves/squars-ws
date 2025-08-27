@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
@@ -12,7 +12,7 @@
             }
 
             :root {
-                background-color: #333;
+                background-color: #242448;
                 color: white;
                 overflow: hidden;
             }
@@ -21,20 +21,34 @@
                 position: fixed;
                 inset: 0;
                 border: 2px solid white;
-                overflow-y: auto;
+                overflow: hidden;
+            }
+
+            #field {
+                position: relative;
+                top: 50%;
+                left: 50%;
+                translate: -50% -50%;
+                width: 600px;
+                height: 600px;
+                border: 3px dotted rebeccapurple;
+            }
+
+            #field,
+            .sprite {
+                border-radius: 9px;
             }
 
             .sprite {
+                position: absolute;
                 width: 100px;
                 aspect-ratio: 1/1;
                 background-color: lightseagreen;
                 border: 2px solid lightcoral;
                 box-shadow: 0px 0px 18px rgba(255, 255, 255, 0.8);
-                position: fixed;
 
                 /* TODO: try smoothing the motion in the game loop -- incrementally change position until an animation frame has passed? */
-
-                /*transition: all 50ms linear;*/
+                transition: all 16.67ms linear;
             }
         </style>
     </head>
