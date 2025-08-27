@@ -1,36 +1,23 @@
 import * as s from "./sprite";
 
-type IdObj = { playerId: s.PlayerId };
-type GameStateObj = { players: Players };
-type Players = Record<s.PlayerId, s.Player>;
+type Players = Record<s.PlayerId, s.Player>; // part of gameState received from server
 
-let sprite = new s.Sprite();
+let field: HTMLDivElement; // the field on which the game is played
+let sprite: s.Sprite; // represents this player
+const sprites: Record<s.PlayerId, s.Sprite> = {}; // local representation of gameState.players
+let gameState: GameState;
+
 const ws = new WebSocket("ws://" + document.location.host + "/ws");
-let gameState: GameStateObj;
 
 async function main() {
-    // DEBUG
-    // window.sprite = sprite;
+    field = document.getElementById("field") as HTMLDivElement;
+    sprite = new s.Sprite({ field });
 
-    // set up WS
     console.log("Connecting to websocket...");
 
-    ws.onclose = () => console.error("Web socket closed!");
-
-    ws.onmessage = (e: MessageEvent) => {
-        const msgObj: IdObj | GameStateObj = JSON.parse(e.data);
-        // console.log("RECEIVED:", msgObj);
-
-        const { playerId } = msgObj as IdObj;
-        playerId && sprite.setPlayerId(playerId);
-
-        const { players } = msgObj as GameStateObj;
-        if (players) {
-            gameState = msgObj as GameStateObj;
-        }
-    };
-
     ws.onopen = () => console.log("Connected");
+    ws.onclose = () => console.error("Web socket closed!");
+    ws.onmessage = onMessage;
 
     addEventListener("keydown", (e) => sprite.input(e.key, true));
     addEventListener("keyup", (e) => sprite.input(e.key, false));
@@ -38,6 +25,36 @@ async function main() {
     await waitFor(200, () => sprite.playerId && !!gameState);
 
     gameLoop();
+}
+
+type PlayerId = { playerId: s.PlayerId };
+type GameState = { players: Players };
+type Message = {
+    msgType: string;
+    payload: PlayerId | GameState;
+};
+
+function onMessage(e: MessageEvent) {
+    const messages = e.data.split("\n");
+
+    for (let i = 0; i < messages.length; i++) {
+        const msg: Message = JSON.parse(messages[i]);
+        // console.log("RECEIVED:", msg);
+
+        const { msgType, payload } = msg;
+        switch (msgType) {
+            case "playerId": {
+                const { playerId } = payload as PlayerId;
+                sprite.setPlayerId(playerId);
+                sprites[playerId] = sprite;
+                break;
+            }
+            case "gState": {
+                gameState = payload as GameState;
+                break;
+            }
+        }
+    }
 }
 
 function waitFor(durationMs: number, have: () => boolean) {
@@ -56,15 +73,11 @@ function sendGameEvent(ws: WebSocket, sprite: s.Sprite) {
     const { playerId, inputState } = sprite;
     const timestampMs = Date.now();
     ws.send(JSON.stringify({ timestampMs, playerId, inputState }) + "\n");
+    // DEBUG
     // console.log("sent at: ", String(timestampMs).slice(9));
 }
 
 async function gameLoop() {
-    // // TODO: will this work? can i call an async function from re
-    // if (ws.readyState !== ws.OPEN) {
-    //     await waitForPlayerId(() => !!sprite.playerId);
-    // }
-
     // NOTE: This appears incorrect, because we're not ackowledging key ups,
     // but the server adjusts player position per event. If everything was
     // false, the server wouldn't move the player anyway.
@@ -73,12 +86,26 @@ async function gameLoop() {
         sendGameEvent(ws, sprite);
     }
 
-    if (gameState) {
-        // TODO: update all player positions
-        // FOR NOW: update just my position
-        const { x, y } = gameState.players[sprite.playerId];
-        sprite.setPos(x, y);
+    const { players } = gameState;
+
+    // remove sprites tied to players that no longer exist
+    for (const playerId in sprites) {
+        if (!(playerId in players)) {
+            sprites[playerId].destroyHTML();
+            delete sprites[playerId];
+        }
     }
+
+    // add a sprite for every new player
+    for (const playerId in players) {
+        const { id, x, y } = players[playerId];
+        if (!(playerId in sprites)) {
+            sprites[playerId] = new s.Sprite({ field, playerId: id, x, y });
+            continue;
+        }
+        sprites[playerId].setPos(x, y);
+    }
+
     requestAnimationFrame(gameLoop);
 }
 

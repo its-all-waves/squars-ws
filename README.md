@@ -6,7 +6,7 @@ Game logic is on the server, for now, with no optimistic or predictive updating 
 
 ## TODO:
 
-- [ ] render other players
+- [x] render other players
 - [ ] deal with boundaries
     - [ ] establish game bounds in server and communicate to client
     - [ ] loop around OR stop at wall
@@ -14,7 +14,9 @@ Game logic is on the server, for now, with no optimistic or predictive updating 
 
 ## TODO :: Issues
 
-- [ ] server seems to drop client after hub `writeWait` in server/hub.go
+- [ ] server/hub.go:160 +0xf4 -- server crash -- cause unknown, but related to spamming messages from client to server
+- [-] server seems to drop client after hub `writeWait` in server/hub.go
+    - NOTE: seems fixed after restoring accidentally deleted end of `writeMessagesFromSendChan`
 
 ## Development
 

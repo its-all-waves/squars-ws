@@ -4,38 +4,44 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Web Socket Game</title>
+
+        <style>
+            * {
+                padding: 0;
+                margin: 0;
+            }
+
+            :root {
+                background-color: #333;
+                color: white;
+                overflow: hidden;
+            }
+
+            body {
+                position: fixed;
+                inset: 0;
+                border: 2px solid white;
+                overflow-y: auto;
+            }
+
+            .sprite {
+                width: 100px;
+                aspect-ratio: 1/1;
+                background-color: lightseagreen;
+                border: 2px solid lightcoral;
+                box-shadow: 0px 0px 18px rgba(255, 255, 255, 0.8);
+                position: fixed;
+
+                /* TODO: try smoothing the motion in the game loop -- incrementally change position until an animation frame has passed? */
+
+                /*transition: all 50ms linear;*/
+            }
+        </style>
     </head>
 
     <script type="module" src="main.ts"></script>
 
-    <body></body>
+    <body>
+        <div id="field" />
+    </body>
 </html>
-
-<style>
-    * {
-        padding: 0;
-        margin: 0;
-    }
-
-    :root {
-        background-color: #333;
-        color: white;
-        overflow: hidden;
-    }
-
-    body {
-        position: fixed;
-        inset: 0;
-        border: 2px solid white;
-        overflow-y: auto;
-    }
-
-    .sprite {
-        width: 100px;
-        aspect-ratio: 1/1;
-        background-color: lightseagreen;
-        border: 2px solid lightcoral;
-        box-shadow: 0px 0px 18px rgba(255, 255, 255, 0.8);
-        position: fixed;
-    }
-</style>

@@ -10,7 +10,7 @@ export type InputState = {
 
 const KEY_PRESS_TO_INPUT: Record<
     Partial<KeyboardEvent["key"]>,
-    keyof s.InputState
+    keyof InputState
 > = {
     ArrowUp: "up",
     ArrowDown: "down",
@@ -22,33 +22,47 @@ const KEY_PRESS_TO_INPUT: Record<
     d: "right",
 };
 
+type Params = {
+    field: HTMLDivElement;
+    x?: number;
+    y?: number;
+    playerId?: PlayerId;
+};
+
 export class Sprite {
     playerId: PlayerId;
     el: HTMLDivElement;
     inputState: InputState;
-    pos: { x: number; y: number };
+    x: number;
+    y: number;
     speed: number = 1; // distance per 1 frame
 
-    constructor() {
-        const el = document.createElement("div");
-        el.className = "sprite";
-        el.id = "sprite";
-        this.el = el;
-        this.center();
-        document.body.append(this.el);
+    constructor(params: Params) {
+        const { field, x, y, playerId } = params;
         this.inputState = {
             up: false,
             down: false,
             left: false,
             right: false,
         };
+        const el = document.createElement("div");
+        el.className = "sprite";
+        this.el = el;
+        x && y ? this.setPos(x, y) : this.center();
+        playerId && this.setPlayerId(playerId);
+        field.append(el);
+    }
+
+    destroyHTML() {
+        this.el.remove();
     }
 
     private center() {
         this.el.style.left = "50%";
         this.el.style.top = "50%";
         const { x, y } = this.el.getBoundingClientRect();
-        this.pos = { x, y };
+        this.x = x;
+        this.y = y;
     }
 
     setPos(x: number, y: number) {
@@ -93,11 +107,12 @@ export class Sprite {
         this.el.style.left = leftPos + "px";
     }
 
-    handleInput() {
-        const { up, down, left, right } = this.inputState;
-        up && this.up();
-        down && this.down();
-        left && this.left();
-        right && this.right();
-    }
+    // TODO: may be used when we do optimistic updates
+    // handleInput() {
+    //     const { up, down, left, right } = this.inputState;
+    //     up && this.up();
+    //     down && this.down();
+    //     left && this.left();
+    //     right && this.right();
+    // }
 }

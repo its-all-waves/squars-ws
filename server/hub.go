@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -13,19 +12,36 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type MessageType = string
+
+const (
+	MSG_TYPE_PLAYER_ID  MessageType = "playerId"
+	MSG_TYPE_GAME_STATE MessageType = "gState"
+)
+
+type Message struct {
+	MsgType MessageType `json:"msgType"`
+	Payload any         `json:"payload"`
+}
+
+func newGameMsgJson(msgType MessageType, data any) ([]byte, error) {
+	msg := Message{
+		MsgType: msgType,
+		Payload: data,
+	}
+	return json.Marshal(msg)
+}
+
 type Client struct {
 	playerId string
 	hub      *GameHub
 	conn     *websocket.Conn
-
-	// buffered channel of outbound messages
-	send chan []byte
+	send     chan []byte // buffered channel of outbound messages
 }
 
 const (
 	// TODO: FIX: client dropping connection after writeWait
-	/* DEBUG */ writeWait = 300 * time.Second // period within which client must message back
-	// writeWait      = 60 * time.Second // period within which client must message back
+	writeWait      = 10 * time.Second // period within which client must message back
 	pongWait       = 60 * time.Second
 	pingPeriod     = (pongWait * 9) / 10 // must be < pongWait
 	maxMessageSize = 512
@@ -57,7 +73,6 @@ func (c *Client) readMessagesIntoHub() {
 		c.conn.Close()
 	}()
 	for {
-		// get one message // TODO: how often? do we for range hub ticker here? or do we move this somewhere else? if we only send from client every tick interval, will that suffice?
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(
@@ -67,7 +82,10 @@ func (c *Client) readMessagesIntoHub() {
 			break
 		}
 		message = bytes.TrimSpace(bytes.ReplaceAll(message, newline, space))
+
+		// DEBUG
 		// log.Println("incoming msg:", string(message))
+
 		c.hub.incoming <- message
 	}
 }
@@ -101,6 +119,7 @@ func (c *Client) writeMessagesFromSendChan() {
 				w.Write(<-c.send)
 			}
 
+			// DEBUG
 			// log.Println("WROTE ALL MESSAGES TO:", c.playerId)
 
 			if err := w.Close(); err != nil {
@@ -118,6 +137,7 @@ func (c *Client) writeMessagesFromSendChan() {
 type GameHub struct {
 	g *game.Game
 
+	// TODO: close the ticker!
 	ticker *time.Ticker
 
 	// register clients
@@ -157,10 +177,14 @@ func (h *GameHub) run() {
 	go h.addRemovePlayers()
 
 	for range h.ticker.C {
-		gStateMsg, err := json.Marshal(h.g)
+
+		gStateMsg, err := newGameMsgJson(MSG_TYPE_GAME_STATE, h.g)
 		if err != nil {
 			log.Println("Couldn't convert game state to json.")
 		}
+
+		// DEBUG
+		// log.Println("gStateMsg:", string(gStateMsg))
 
 		for client := range h.clients {
 			select {
@@ -180,6 +204,7 @@ func (h *GameHub) addRemovePlayers() {
 		case client := <-h.register:
 			h.clients[client] = true
 			h.g.AddPlayer(client.playerId)
+
 		case client := <-h.unregister:
 			h.g.RemovePlayer(client.playerId)
 			if _, ok := h.clients[client]; ok {
@@ -207,11 +232,13 @@ func (h *GameHub) updateGameState() {
 			return
 		}
 
+		// DEBUG
 		// log.Println("PULLED MSG FROM INCOMING:", string(message))
 
 		event := game.GameEvent{}
 		err := json.Unmarshal(message, &event)
 
+		// DEBUG
 		// log.Println("GAME EVENT CONVERTED FROM MESSAGE:", event)
 
 		if err != nil {
@@ -221,13 +248,6 @@ func (h *GameHub) updateGameState() {
 		}
 		h.g.Update(event)
 	}
-
-	// TODO: FOR NOW: add a word to the message and stick the new message in broadcast
-	// for message := range h.incoming {
-
-	// log.Println("Added msg to broadcast chan:", string(message))
-	// h.broadcast <- []byte("GOT IT!" + string(message))
-	// }
 }
 
 func serveWs(hub *GameHub, w http.ResponseWriter, r *http.Request) {
@@ -242,7 +262,17 @@ func serveWs(hub *GameHub, w http.ResponseWriter, r *http.Request) {
 	client.setConn()
 	hub.register <- client
 
-	idMsg := fmt.Appendf(nil, `{ "playerId": "%v" }`, playerId)
+	idMsg, err := newGameMsgJson(
+		MSG_TYPE_PLAYER_ID,
+		map[string]game.PlayerId{"playerId": playerId},
+	)
+	if err != nil {
+		log.Println("Couldn't create a json message from playerId.")
+	}
+
+	// DEBUG
+	// log.Println("SEND ID MESSAGE:", string(idMsg))
+
 	client.send <- idMsg
 
 	go client.readMessagesIntoHub()
