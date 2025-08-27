@@ -158,7 +158,7 @@ type GameHub struct {
 func newGameHub() *GameHub {
 	return &GameHub{
 		g:          game.New(),
-		ticker:     time.NewTicker(time.Second / time.Duration(game.Settings.TickRate)),
+		ticker:     time.NewTicker(time.Second / time.Duration(game.SETTINGS.TickRate)),
 		clients:    make(map[*Client]bool),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),

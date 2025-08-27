@@ -14,7 +14,7 @@ type size struct {
 	y position
 }
 
-var Settings = struct {
+var SETTINGS = struct {
 	TickRate    uint8
 	FieldSize   size // dimensions of the field
 	SpriteSize  size
@@ -24,6 +24,16 @@ var Settings = struct {
 	FieldSize:   size{600, 600}, // TODO: share with client
 	SpriteSize:  size{100, 100},
 	PlayerSpeed: 7,
+}
+
+const PALETTE_24BIT_LEN = 24
+
+// thank you, Claude
+var PALETTE_24BIT = [PALETTE_24BIT_LEN]uint32{
+	0xF2C5B8, 0xE8A5A5, 0xF0A0E0, 0xB584F5, 0xF06A8A, 0xE8809A,
+	0xF8A060, 0xF5D580, 0x80E080, 0x70D8C8, 0x60C8E8, 0x50B8E8,
+	0x60A0F8, 0x9090F8, 0xB8C0F0, 0xA0A8D8, 0xFF6B6B, 0xFF8E53,
+	0x4ECDC4, 0x45B7D1, 0x96CEB4, 0xFFEAA7, 0xDDA0DD, 0x20B2AA,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -42,11 +52,11 @@ type Player struct {
 func NewPlayer() *Player {
 	return &Player{
 		Id:     uuid.New().String(),
-		Color1: rand.Uint32() >> 8,
-		Color2: rand.Uint32() >> 8,
-		Color3: rand.Uint32() >> 8, // opacity is defined on client
-		X:      0,
-		Y:      0,
+		Color1: PALETTE_24BIT[rand.Uint32N(PALETTE_24BIT_LEN)],
+		Color2: PALETTE_24BIT[rand.Uint32N(PALETTE_24BIT_LEN)],
+		Color3: PALETTE_24BIT[rand.Uint32N(PALETTE_24BIT_LEN)],
+		X:      SETTINGS.FieldSize.x/2 - SETTINGS.SpriteSize.x/2,
+		Y:      SETTINGS.FieldSize.y/2 - SETTINGS.SpriteSize.y/2,
 	}
 }
 
@@ -101,9 +111,9 @@ TODO: sprite:sprite collision detection
 */
 func (g *Game) Update(e GameEvent) {
 	player := g.Players[e.PlayerId]
-	speed := Settings.PlayerSpeed
-	fieldSize := Settings.FieldSize
-	spriteSize := Settings.SpriteSize
+	speed := SETTINGS.PlayerSpeed
+	fieldSize := SETTINGS.FieldSize
+	spriteSize := SETTINGS.SpriteSize
 
 	// NOTE: inverted directions like css
 	if e.InputState.Up {
