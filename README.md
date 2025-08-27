@@ -6,16 +6,19 @@ Game logic is on the server, for now, with no optimistic or predictive updating 
 
 ## TODO:
 
+- [ ] collision detection - alternatives to quadtree?
 - [x] render other players
 - [x] player starts at center position with random color
-- [ ] deal with boundaries
-    - [-] establish game bounds in server
-        - [ ] communicate to client
+- [x] deal with boundaries
+    - [x] establish game bounds in server
+        - [x] communicate to client
     - [x] loop around OR stop at wall
 
 ## TODO :: Issues
 
-- [ ] server/hub.go:160 +0xf4 -- server crash -- cause unknown, but related to spamming messages from client to server
+- [ ] timestamp these ⬇︎ entries from now on
+- [-] server/hub.go:160 +0xf4 -- server crash -- cause unknown, but related to spamming messages from client to server
+    - NOTE: hasn't happened in a while
 - [-] server seems to drop client after hub `writeWait` in server/hub.go
     - NOTE: seems fixed after restoring accidentally deleted end of `writeMessagesFromSendChan`
 

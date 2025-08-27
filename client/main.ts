@@ -21,29 +21,38 @@ async function main() {
     addEventListener("keydown", (e) => sprite.input(e.key, true));
     addEventListener("keyup", (e) => sprite.input(e.key, false));
 
-    await waitFor(200, () => sprite?.playerId && !!gameState);
+    await waitFor(200, () => s.Sprite.size && sprite?.playerId && !!gameState);
 
     gameLoop();
 }
 
-type PlayerMsg = { player: s.Player };
+type PlayerCreatedMsg = {
+    player: s.Player;
+    fieldSize: s.Size;
+    spriteSize: s.Size;
+};
 type GameStateMsg = { players: Players };
 type Message = {
     msgType: string;
-    payload: PlayerMsg | GameStateMsg;
+    payload: PlayerCreatedMsg | GameStateMsg;
 };
 
 function onMessage(e: MessageEvent) {
     const messages = e.data.split("\n");
-
     for (let i = 0; i < messages.length; i++) {
         const msg: Message = JSON.parse(messages[i]);
+
+        // DEBUG
         // console.log("RECEIVED:", msg);
 
         const { msgType, payload } = msg;
         switch (msgType) {
             case "PLAYER_CREATED": {
-                const { player } = payload as PlayerMsg;
+                const { player, fieldSize, spriteSize } =
+                    payload as PlayerCreatedMsg;
+                field.style.width = String(fieldSize.w) + "px";
+                field.style.height = String(fieldSize.h) + "px";
+                s.Sprite.size = spriteSize;
                 sprite = new s.Sprite({ field, player });
                 sprites[player.id] = sprite;
                 break;
@@ -56,19 +65,18 @@ function onMessage(e: MessageEvent) {
     }
 }
 
-function waitFor(durationMs: number, have: () => boolean) {
+function waitFor(retryIntervalMs: number, isTrue: () => boolean) {
     return new Promise((resolve) => {
         function check() {
             // @ts-ignore
-            have() && resolve();
-            setTimeout(check, durationMs);
+            isTrue() && resolve();
+            setTimeout(check, retryIntervalMs);
         }
         check();
     });
 }
 
 function sendGameEvent(ws: WebSocket, sprite: s.Sprite) {
-    // TODO: every 10 seconds, if there's no message to send, ping the server
     const { playerId, inputState } = sprite;
     const timestampMs = Date.now();
     ws.send(JSON.stringify({ timestampMs, playerId, inputState }) + "\n");

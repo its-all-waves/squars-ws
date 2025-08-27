@@ -40,7 +40,6 @@ type Client struct {
 }
 
 const (
-	// TODO: FIX: client dropping connection after writeWait
 	writeWait      = 10 * time.Second // period within which client must message back
 	pongWait       = 60 * time.Second
 	pingPeriod     = (pongWait * 9) / 10 // must be < pongWait
@@ -125,6 +124,7 @@ func (c *Client) writeMessagesFromSendChan() {
 			if err := w.Close(); err != nil {
 				return
 			}
+
 		case <-ticker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
@@ -264,8 +264,12 @@ func serveWs(hub *GameHub, w http.ResponseWriter, r *http.Request) {
 
 	idMsg, err := newMessageJson(
 		MSG_TYPE_PLAYER_CREATED,
-		map[string]*game.Player{"player": newPlayer},
-	)
+		map[string]any{
+			"player":     newPlayer,
+			"fieldSize":  game.SETTINGS.FieldSize,
+			"spriteSize": game.SETTINGS.SpriteSize,
+		})
+
 	if err != nil {
 		log.Println("Couldn't create a json message from playerId.")
 	}

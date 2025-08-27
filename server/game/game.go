@@ -10,8 +10,8 @@ import (
 type position = int
 
 type size struct {
-	x position
-	y position
+	W position `json:"w"`
+	H position `json:"h"`
 }
 
 var SETTINGS = struct {
@@ -21,8 +21,8 @@ var SETTINGS = struct {
 	PlayerSpeed position // pixels traveled per tick
 }{
 	TickRate:    60,
-	FieldSize:   size{600, 600}, // TODO: share with client
-	SpriteSize:  size{100, 100},
+	FieldSize:   size{800, 800},
+	SpriteSize:  size{60, 60},
 	PlayerSpeed: 7,
 }
 
@@ -55,8 +55,8 @@ func NewPlayer() *Player {
 		Color1: PALETTE_24BIT[rand.Uint32N(PALETTE_24BIT_LEN)],
 		Color2: PALETTE_24BIT[rand.Uint32N(PALETTE_24BIT_LEN)],
 		Color3: PALETTE_24BIT[rand.Uint32N(PALETTE_24BIT_LEN)],
-		X:      SETTINGS.FieldSize.x/2 - SETTINGS.SpriteSize.x/2,
-		Y:      SETTINGS.FieldSize.y/2 - SETTINGS.SpriteSize.y/2,
+		X:      SETTINGS.FieldSize.W/2 - SETTINGS.SpriteSize.W/2,
+		Y:      SETTINGS.FieldSize.H/2 - SETTINGS.SpriteSize.H/2,
 	}
 }
 
@@ -120,12 +120,12 @@ func (g *Game) Update(e GameEvent) {
 		player.Y = max(player.Y-speed, 0)
 	}
 	if e.InputState.Down {
-		player.Y = min(player.Y+speed, fieldSize.y-spriteSize.y)
+		player.Y = min(player.Y+speed, fieldSize.H-spriteSize.H)
 	}
 	if e.InputState.Left {
 		player.X = max(player.X-speed, 0)
 	}
 	if e.InputState.Right {
-		player.X = min(player.X+speed, fieldSize.y-spriteSize.y)
+		player.X = min(player.X+speed, fieldSize.H-spriteSize.H)
 	}
 }
