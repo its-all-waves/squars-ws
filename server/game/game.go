@@ -1,6 +1,11 @@
 package game
 
-import "log"
+import (
+	"log"
+	"math/rand/v2"
+
+	"github.com/google/uuid"
+)
 
 type position = int
 
@@ -26,16 +31,22 @@ var Settings = struct {
 type PlayerId = string
 
 type Player struct {
-	Id PlayerId `json:"id"`
-	X  position `json:"x"`
-	Y  position `json:"y"`
+	Id     PlayerId `json:"id"`
+	Color1 uint32   `json:"color1"` // 0x 00 FF FF FF -> most significant pair = 00 for 24 bit color.
+	Color2 uint32   `json:"color2"` // if most signficant pair is used, least signficant pair becomes opacity
+	Color3 uint32   `json:"color3"`
+	X      position `json:"x"`
+	Y      position `json:"y"`
 }
 
-func NewPlayer(id PlayerId) *Player {
+func NewPlayer() *Player {
 	return &Player{
-		Id: id,
-		X:  0,
-		Y:  0,
+		Id:     uuid.New().String(),
+		Color1: rand.Uint32() >> 8,
+		Color2: rand.Uint32() >> 8,
+		Color3: rand.Uint32() >> 8, // opacity is defined on client
+		X:      0,
+		Y:      0,
 	}
 }
 
@@ -71,16 +82,16 @@ func New() *Game {
 	}
 }
 
-func (g *Game) AddPlayer(playerId string) {
+func (g *Game) AddPlayer(p *Player) {
+	g.Players[p.Id] = p
 	// DEBUG
-	log.Println("Added player:", playerId)
-
-	g.Players[playerId] = NewPlayer(playerId)
+	log.Println("Added player:", p.Id)
 }
 
-func (g *Game) RemovePlayer(playerId string) {
-	log.Println("Removed player:", playerId)
+func (g *Game) RemovePlayer(playerId PlayerId) {
 	delete(g.Players, playerId)
+	// DEBUG
+	log.Println("Removed player:", playerId)
 }
 
 /*

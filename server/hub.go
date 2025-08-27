@@ -8,15 +8,15 @@ import (
 	"time"
 	"web-socket-game/game"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
 type MessageType = string
 
 const (
-	MSG_TYPE_PLAYER_ID  MessageType = "playerId"
-	MSG_TYPE_GAME_STATE MessageType = "gState"
+	// sent once to a client when they register, not when any player is added to the game
+	MSG_TYPE_PLAYER_CREATED MessageType = "PLAYER_CREATED"
+	MSG_TYPE_GAME_STATE     MessageType = "GAME_STATE"
 )
 
 type Message struct {
@@ -24,7 +24,7 @@ type Message struct {
 	Payload any         `json:"payload"`
 }
 
-func newGameMsgJson(msgType MessageType, data any) ([]byte, error) {
+func newMessageJson(msgType MessageType, data any) ([]byte, error) {
 	msg := Message{
 		MsgType: msgType,
 		Payload: data,
@@ -33,10 +33,10 @@ func newGameMsgJson(msgType MessageType, data any) ([]byte, error) {
 }
 
 type Client struct {
-	playerId string
-	hub      *GameHub
-	conn     *websocket.Conn
-	send     chan []byte // buffered channel of outbound messages
+	player *game.Player
+	hub    *GameHub
+	conn   *websocket.Conn
+	send   chan []byte // buffered channel of outbound messages
 }
 
 const (
@@ -178,7 +178,7 @@ func (h *GameHub) run() {
 
 	for range h.ticker.C {
 
-		gStateMsg, err := newGameMsgJson(MSG_TYPE_GAME_STATE, h.g)
+		gStateMsg, err := newMessageJson(MSG_TYPE_GAME_STATE, h.g)
 		if err != nil {
 			log.Println("Couldn't convert game state to json.")
 		}
@@ -203,11 +203,11 @@ func (h *GameHub) addRemovePlayers() {
 		select {
 		case client := <-h.register:
 			h.clients[client] = true
-			h.g.AddPlayer(client.playerId)
+			h.g.AddPlayer(client.player)
 
 		case client := <-h.unregister:
-			h.g.RemovePlayer(client.playerId)
 			if _, ok := h.clients[client]; ok {
+				h.g.RemovePlayer(client.player.Id)
 				delete(h.clients, client)
 				close(client.send)
 			}
@@ -257,14 +257,14 @@ func serveWs(hub *GameHub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	playerId := uuid.New().String()
-	client := &Client{playerId, hub, conn, make(chan []byte, 256)}
+	newPlayer := game.NewPlayer()
+	client := &Client{newPlayer, hub, conn, make(chan []byte, 256)}
 	client.setConn()
 	hub.register <- client
 
-	idMsg, err := newGameMsgJson(
-		MSG_TYPE_PLAYER_ID,
-		map[string]game.PlayerId{"playerId": playerId},
+	idMsg, err := newMessageJson(
+		MSG_TYPE_PLAYER_CREATED,
+		map[string]*game.Player{"player": newPlayer},
 	)
 	if err != nil {
 		log.Println("Couldn't create a json message from playerId.")

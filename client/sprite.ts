@@ -1,5 +1,13 @@
 export type PlayerId = string;
-export type Player = { id: PlayerId; x: number; y: number };
+
+export type Player = {
+    id: PlayerId;
+    color1: number;
+    color2: number;
+    color3: number;
+    x: number;
+    y: number;
+};
 
 export type InputState = {
     up: boolean;
@@ -26,7 +34,7 @@ type Params = {
     field: HTMLDivElement;
     x?: number;
     y?: number;
-    playerId?: PlayerId;
+    player?: Player;
 };
 
 export class Sprite {
@@ -38,7 +46,7 @@ export class Sprite {
     speed: number = 1; // distance per 1 frame
 
     constructor(params: Params) {
-        const { field, x, y, playerId } = params;
+        const { field, x, y, player } = params;
         this.inputState = {
             up: false,
             down: false,
@@ -49,7 +57,7 @@ export class Sprite {
         el.className = "sprite";
         this.el = el;
         x && y ? this.setPos(x, y) : this.setPos(0, 0);
-        playerId && this.setPlayerId(playerId);
+        player && this.inheritPlayer(player);
         field.append(el);
     }
 
@@ -71,8 +79,15 @@ export class Sprite {
         this.el.style.top = String(y) + "px";
     }
 
-    setPlayerId(val: string) {
-        this.el.id = this.playerId = val;
+    inheritPlayer(p: Player) {
+        const { id, color1, color2, color3, x, y } = p;
+        this.el.id = this.playerId = p.id;
+        this.el.style.backgroundColor = "#" + color1.toString(16);
+        this.el.style.borderColor = "#" + color2.toString(16);
+        this.el.style.boxShadow = spriteCssShadow("#" + color3.toString(16));
+        console.warn(spriteCssShadow("#" + color3.toString(16)));
+        this.setPos(x, y);
+        this.playerId = id;
     }
 
     input(key: KeyboardEvent["key"], keyState: boolean) {
@@ -116,4 +131,10 @@ export class Sprite {
     //     left && this.left();
     //     right && this.right();
     // }
+}
+
+function spriteCssShadow(hexColor: string) {
+    // 0.6 * 255 to hex = 0x99
+    // 0.8 * 255 to hex = 0xCC
+    return `0px 0px 18px ${hexColor}CC`;
 }

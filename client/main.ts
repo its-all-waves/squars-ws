@@ -5,13 +5,12 @@ type Players = Record<s.PlayerId, s.Player>; // part of gameState received from 
 let field: HTMLDivElement; // the field on which the game is played
 let sprite: s.Sprite; // represents this player
 const sprites: Record<s.PlayerId, s.Sprite> = {}; // local representation of gameState.players
-let gameState: GameState;
+let gameState: GameStateMsg;
 
 const ws = new WebSocket("ws://" + document.location.host + "/ws");
 
 async function main() {
     field = document.getElementById("field") as HTMLDivElement;
-    sprite = new s.Sprite({ field });
 
     console.log("Connecting to websocket...");
 
@@ -22,16 +21,16 @@ async function main() {
     addEventListener("keydown", (e) => sprite.input(e.key, true));
     addEventListener("keyup", (e) => sprite.input(e.key, false));
 
-    await waitFor(200, () => sprite.playerId && !!gameState);
+    await waitFor(200, () => sprite?.playerId && !!gameState);
 
     gameLoop();
 }
 
-type PlayerId = { playerId: s.PlayerId };
-type GameState = { players: Players };
+type PlayerMsg = { player: s.Player };
+type GameStateMsg = { players: Players };
 type Message = {
     msgType: string;
-    payload: PlayerId | GameState;
+    payload: PlayerMsg | GameStateMsg;
 };
 
 function onMessage(e: MessageEvent) {
@@ -43,14 +42,14 @@ function onMessage(e: MessageEvent) {
 
         const { msgType, payload } = msg;
         switch (msgType) {
-            case "playerId": {
-                const { playerId } = payload as PlayerId;
-                sprite.setPlayerId(playerId);
-                sprites[playerId] = sprite;
+            case "PLAYER_CREATED": {
+                const { player } = payload as PlayerMsg;
+                sprite = new s.Sprite({ field, player });
+                sprites[player.id] = sprite;
                 break;
             }
-            case "gState": {
-                gameState = payload as GameState;
+            case "GAME_STATE": {
+                gameState = payload as GameStateMsg;
                 break;
             }
         }
@@ -88,22 +87,21 @@ async function gameLoop() {
 
     const { players } = gameState;
 
-    // remove sprites tied to players that no longer exist
+    // remove sprites of players that no longer exist
     for (const playerId in sprites) {
-        if (!(playerId in players)) {
-            sprites[playerId].destroyHTML();
-            delete sprites[playerId];
-        }
+        if (playerId in players) continue;
+        sprites[playerId].destroyHTML();
+        delete sprites[playerId];
     }
 
     // add a sprite for every new player
     for (const playerId in players) {
-        const { id, x, y } = players[playerId];
+        const player = players[playerId];
         if (!(playerId in sprites)) {
-            sprites[playerId] = new s.Sprite({ field, playerId: id, x, y });
+            sprites[playerId] = new s.Sprite({ field, player });
             continue;
         }
-        sprites[playerId].setPos(x, y);
+        sprites[playerId].setPos(player.x, player.y);
     }
 
     requestAnimationFrame(gameLoop);
